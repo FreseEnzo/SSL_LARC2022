@@ -1,0 +1,11 @@
+syntax = "proto2";
+
+message Feedback {
+required uint32 id = 1;
+required uint32 status = 2;
+required float battery = 3;
+required float encoder1 = 4;
+required float encoder2 = 5;
+required float encoder3 = 6;
+required float encoder4 = 7;
+}
