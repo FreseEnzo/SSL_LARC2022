@@ -35,7 +35,7 @@ void Kick::SetKick(float kickspeedx, float kickspeedz){			//Argumento em decimet
 		KickHigh(kickspeedz);				//kickspeed = tempo de chute em seg
 #else
 		//conversao speed->time
-		if(kickspeedx >= 23.85){
+		if(kickspeedx <= 23.85){ // Aqui que bugava quando dava 1 chute e nao chutava mais (tava >=)
 			KickHigh((6-(log(34-kickspeedx*1.41421356237)/log(2))));	//argumento em milisegundos
 		}else{
 			KickHigh(10);
@@ -77,13 +77,13 @@ void Kick::KickHigh(float kickPower){
 
 void Kick::KickLow(float kickPower){
 	if(!kickEnable && HAL_GPIO_ReadPin(S1_GPIO_Port, S1_Pin)){
-		HAL_GPIO_WritePin(CHIP_KICK_GPIO_Port, CHIP_KICK_Pin, GPIO_PinState(RESET));
+		HAL_GPIO_WritePin(KICK_C_GPIO_Port, KICK_C_Pin, GPIO_PinState(RESET));
 
 		KICK_HL_TIM->Instance->ARR=10*kickPower;
 
 		__HAL_TIM_SET_COUNTER(KICK_HL_TIM,0);
-
 		__HAL_TIM_SET_COUNTER(KICK_RC_TIM,0);
+
 		kickCharged = GPIO_PIN_RESET;
 		kickEnable=GPIO_PIN_SET;
 
