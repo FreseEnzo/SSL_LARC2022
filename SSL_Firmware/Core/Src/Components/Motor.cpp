@@ -73,22 +73,52 @@ Motor::Motor (uint8_t motorId){
 
 void Motor::SetSpeed(int32_t spd){
 	Pwm_Max = TIM8->ARR;
-	if(spd>0){
-		HAL_GPIO_WritePin(MBL_GPIO_Port, MBL_Pin, GPIO_PinState(SET));
-		*MBH_Pwm = Pwm_Max; //MBH
-		HAL_GPIO_WritePin(MAL_GPIO_Port, MAL_Pin, GPIO_PinState(RESET));
-		*MAH_Pwm = Pwm_Max - spd; //MAH
-	}else if(spd<0){
-		HAL_GPIO_WritePin(MBL_GPIO_Port, MBL_Pin, GPIO_PinState(RESET));
-		*MBH_Pwm = Pwm_Max + spd; //MBH
-		HAL_GPIO_WritePin(MAL_GPIO_Port, MAL_Pin, GPIO_PinState(SET));
-		*MAH_Pwm = Pwm_Max; //MAH
-	}else{
-		HAL_GPIO_WritePin(MBL_GPIO_Port, MBL_Pin, GPIO_PinState(SET));
-		*MBH_Pwm = Pwm_Max; //MBH
-		HAL_GPIO_WritePin(MAL_GPIO_Port, MAL_Pin, GPIO_PinState(SET));
-		*MAH_Pwm = Pwm_Max; //MAH
+	if(speed_anterior*spd<=0){
+//		TIM8-> CNT &= 0x0; // restart the timer
+		speed_anterior = spd;
+		if(spd>0){
+			HAL_GPIO_WritePin(MAL_GPIO_Port, MAL_Pin, GPIO_PinState(RESET));
+				*MBH_Pwm = Pwm_Max; //MBH
+				TIM8-> CNT = Pwm_Max; // restart the timer
+				TIM1-> CNT = Pwm_Max; // restart the timer
+			HAL_GPIO_WritePin(MBL_GPIO_Port, MBL_Pin, GPIO_PinState(SET));
+				*MAH_Pwm = Pwm_Max - spd; //MAH
+		}else if(spd<0){
+				HAL_GPIO_WritePin(MBL_GPIO_Port, MBL_Pin, GPIO_PinState(RESET));
+				*MAH_Pwm = Pwm_Max; //MAH
+				TIM8-> CNT = Pwm_Max; // restart the timer
+				TIM1-> CNT = Pwm_Max; // restart the timer
+				HAL_GPIO_WritePin(MAL_GPIO_Port, MAL_Pin, GPIO_PinState(SET));
+				*MBH_Pwm = Pwm_Max + spd; //MBH
+		}else{
+			*MBH_Pwm = Pwm_Max; //MBH
+			*MAH_Pwm = Pwm_Max; //MAH
+			TIM8-> CNT = Pwm_Max; // restart the timer
+			TIM1-> CNT = Pwm_Max; // restart the timer
+			HAL_GPIO_WritePin(MBL_GPIO_Port, MBL_Pin, GPIO_PinState(SET));
+			HAL_GPIO_WritePin(MAL_GPIO_Port, MAL_Pin, GPIO_PinState(SET));
+			}
 	}
+	else{
+		speed_anterior = spd;
+		if(spd>0){
+					HAL_GPIO_WritePin(MAL_GPIO_Port, MAL_Pin, GPIO_PinState(RESET));
+							*MBH_Pwm = Pwm_Max; //MBH
+					HAL_GPIO_WritePin(MBL_GPIO_Port, MBL_Pin, GPIO_PinState(SET));
+							*MAH_Pwm = Pwm_Max - spd; //MAH
+			}else if(spd<0){
+						HAL_GPIO_WritePin(MBL_GPIO_Port, MBL_Pin, GPIO_PinState(RESET));
+						*MAH_Pwm = Pwm_Max; //MAH
+						HAL_GPIO_WritePin(MAL_GPIO_Port, MAL_Pin, GPIO_PinState(SET));
+						*MBH_Pwm = Pwm_Max + spd; //MBH
+			}else{
+				*MBH_Pwm = Pwm_Max; //MBH
+				*MAH_Pwm = Pwm_Max; //MAH
+				HAL_GPIO_WritePin(MBL_GPIO_Port, MBL_Pin, GPIO_PinState(SET));
+				HAL_GPIO_WritePin(MAL_GPIO_Port, MAL_Pin, GPIO_PinState(SET));
+			}
+	}
+
 }
 
 

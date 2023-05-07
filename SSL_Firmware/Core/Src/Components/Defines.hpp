@@ -12,7 +12,7 @@
 
 
 
-#define INTEL
+//#define INTEL
 //#define SEMCONTROLE
 //#define KICKTIME
 //#define DEEPWEB

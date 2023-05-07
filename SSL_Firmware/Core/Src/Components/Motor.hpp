@@ -58,6 +58,7 @@ private:
 	float derror = 0;
 	float last_error[2000] = {0};
 	float ierror = 0;
+	float speed_anterior=0;
 	static float cp;
 	static float cd;
 	static float ci;
