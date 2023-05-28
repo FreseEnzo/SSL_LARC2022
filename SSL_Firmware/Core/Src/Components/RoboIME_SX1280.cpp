@@ -13,6 +13,7 @@
 extern UART_HandleTypeDef huart2;
 extern TIM_HandleTypeDef htim6;
 extern SPI_HandleTypeDef hspi2;
+extern SPI_HandleTypeDef hspi1;
 
 typedef enum
 {
@@ -64,9 +65,9 @@ RadioCallbacks_t callbacks =
     NULL,             	// cadDone
 };
 
-SX1280Hal radio0(&hspi2, SX1280_NSS_GPIO_Port, SX1280_NSS_Pin, SX1280_BUSY_GPIO_Port, SX1280_BUSY_Pin, SX1280_RST_GPIO_Port, SX1280_RST_Pin, &callbacks);
+SX1280Hal radio0(&hspi1, SX1280_CSn_GPIO_Port, SX1280_CSn_Pin, SX1280_BUSY_GPIO_Port, SX1280_BUSY_Pin, SX1280_RST_GPIO_Port, SX1280_RST_Pin, &callbacks);
 // Feedback Radio
-//SX1280Hal radio1(&hspi2, SX_FB_NSS_GPIO_Port, SX_FB_NSS_Pin, SX_FB_BUSY_GPIO_Port, SX_FB_BUSY_Pin, SX_FB_RST_GPIO_Port, SX_FB_RST_Pin, &callbacks);
+//SX1280Hal radio1(&hspi2, SX_FB_NSS_GPIO_Port, SX_FB_NSS_Pin, SX_FB_BUSY_GPIO_Port, SX_FB_BUS0_Pin, SX_FB_RST_GPIO_Port, SX_FB_RST_Pin, &callbacks);
 
 //Public methods
 void RoboIME_SX1280::GPIOCallback(void){
@@ -168,6 +169,7 @@ uint8_t RoboIME_SX1280::sendPayload(uint8_t* payload, uint8_t payloadSize){
 	radio0.SetDioIrqParams( TxIrqMask, TxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
 	radio0.SendPayload( payload, payloadSize,( TickTime_t ){ RADIO_TICK_SIZE_1000_US,TX_TIMEOUT_VALUE } );
 	radio0.GetIrqStatus();
+	HAL_Delay(1);
 	/*while(1)
 		 	{
 		 		if(AppState == APP_TX)
@@ -184,9 +186,11 @@ uint8_t RoboIME_SX1280::sendPayload(uint8_t* payload, uint8_t payloadSize){
 }
 uint8_t RoboIME_SX1280::receivePayload(uint8_t* payload){
 	uint8_t actualBufferSize;
+	HAL_Delay(3);
   	radio0.SetDioIrqParams( RxIrqMask, RxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
    	radio0.SetRx( ( TickTime_t ) { RADIO_TICK_SIZE_1000_US, 0x0000 } );
 	oldCount = payloadTemp[0];
+
 //HAL_Delay(5);
 		if(AppState == APP_RX)
 		{
@@ -207,6 +211,7 @@ uint8_t RoboIME_SX1280::receivePayload(uint8_t* payload){
 		{
 			return 0;
 		}
+
 
 }
 void RoboIME_SX1280::setPayload( uint8_t *buffer, uint8_t size, uint8_t offset ){

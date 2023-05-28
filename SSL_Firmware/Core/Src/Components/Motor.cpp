@@ -18,7 +18,7 @@
 	float Motor::cd=(10000.0f/10000)*65536;
 	float Motor::cl=(0.36)*65536;
 #endif
-extern nRF_Feedback_Packet_t nRF_Feedback_Packet;
+extern SX1280_Feedback_Packet_t SX1280_Feedback_Packet;
 
 Motor::Motor (uint8_t motorId){
 	motorId_attrib = motorId;
@@ -160,16 +160,16 @@ void Motor::ControlSpeed(float desired_speed){
 	float out = cp*error + ci * ierror + cd * derror + cl*desired_speed; //Soma de duty cycle (linear)
 	switch (motorId_attrib){
 	case 0:
-		nRF_Feedback_Packet.encoder1 = real_wheel_speed;
+		SX1280_Feedback_Packet.encoder1 = real_wheel_speed;
 		break;
 	case 1:
-		nRF_Feedback_Packet.encoder2 = real_wheel_speed;
+		SX1280_Feedback_Packet.encoder2 = real_wheel_speed;
 		break;
 	case 2:
-		nRF_Feedback_Packet.encoder3 = real_wheel_speed;
+		SX1280_Feedback_Packet.encoder3 = real_wheel_speed;
 		break;
 	case 3:
-		nRF_Feedback_Packet.encoder4 = real_wheel_speed;
+		SX1280_Feedback_Packet.encoder4 = real_wheel_speed;
 		break;
 	}
 #ifdef DEEPWEB

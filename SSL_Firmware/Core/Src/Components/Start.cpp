@@ -14,10 +14,9 @@
 #include "Robo.hpp"
 #include "CommunicationUSB.hpp"
 #include "BTS7960B.hpp"
-#include "RoboIME_RF24.hpp"
 #include "SerialDebug.hpp"
-#include "CommunicationNRF.hpp"
 #include "Defines.hpp"
+#include "RoboIME_SX1280.hpp"
 
 //Protobuf includes
 #include "grSim_Commands.pb.h"
@@ -41,10 +40,13 @@ extern void (*usbRecvCallback)(uint8_t*, uint32_t*);
 extern USBD_HandleTypeDef hUsbDeviceFS;
 grSim_Robot_Command receivedPacket = grSim_Robot_Command_init_default;
 Feedback sendPacket[NUM_ROBOTS];
-bool transmitter;
-nRF_Send_Packet_t nRF_Send_Packet[16];
-nRF_Feedback_Packet_t nRF_Feedback_Packet;
-nRF_Feedback_Packet_t nRF_FeedbackReceive_Packet[16];
+
+// Master true , Slave = false
+bool transmitter = false;
+
+SX1280_Send_Packet_t SX1280_Send_Packet[16];
+SX1280_Feedback_Packet_t SX1280_Feedback_Packet;
+SX1280_Feedback_Packet_t SX1280_FeedbackReceive_Packet[16];
 uint8_t commCounter = 0;
 uint32_t usbCounter = 0;
 
@@ -56,40 +58,42 @@ Robo robo(1);
 CommunicationUSB usb(&usbRecvCallback);
 //BTS7960B motorbts(&(TIM10->CCR1), &(TIM11->CCR1), GPIOD, GPIO_PIN_0, GPIOD, GPIO_PIN_1);
 //Motor motor[4] = {Motor(0), Motor(1), Motor(2), Motor(3)};
-RoboIME_RF24 radio(nRF_CSn_GPIO_Port, nRF_CSn_Pin, nRF_CE_GPIO_Port, nRF_CE_Pin, nRF_IRQ_GPIO_Port, nRF_IRQ_Pin, &hspi1);
+//RoboIME_RF24 radio(SX1280_CSn_GPIO_Port, SX1280_CSn_Pin, SX1280_CE_GPIO_Port, SX1280_CE_Pin, SX1280_IRQ_GPIO_Port, SX1280_IRQ_Pin, &hspi1);
+RoboIME_SX1280 radio_SX1280;
 SerialDebug debug(&huart3);
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if(htim == &htim6){
-		if(!transmitter && radio.ready){
+	/*	if(!transmitter ){/*if(!transmitter && radio.ready)
 			HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-			nRF_Feedback_Packet.packetId++;
-			nRF_Feedback_Packet.battery = robo.calc_vbat();
+			SX1280_Feedback_Packet.packetId++;
+			SX1280_Feedback_Packet.battery = robo.calc_vbat();
 			if(robo.hasBall()){
-				nRF_Feedback_Packet.status |= 1<<0;		//Set bit 0
+				SX1280_Feedback_Packet.status |= 1<<0;		//Set bit 0
 			}else{
-				nRF_Feedback_Packet.status &= ~(1<<0);	//Reset bit 0
+				SX1280_Feedback_Packet.status &= ~(1<<0);	//Reset bit 0
 			}
 			if(robo.R_Kick->kickCharged){
-				nRF_Feedback_Packet.status |= 1<<1;
+				SX1280_Feedback_Packet.status |= 1<<1;
 			}else{
-				nRF_Feedback_Packet.status &= ~(1<<1);
+				SX1280_Feedback_Packet.status &= ~(1<<1);
 			}
-			radio.UploadAckPayload((uint8_t*)&nRF_Feedback_Packet, sizeof(nRF_Feedback_Packet));
-			if(radio.getReceivedPayload((uint8_t*)nRF_Send_Packet)){
-				/*sprintf(serialBuf, "Vt %lf", nRF_Send_Packet[0].veltangent);
-				debug.debug(serialBuf);*/
-				HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
-				HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_SET);
+			radio.UploadAckPayload((uint8_t*)&SX1280_Feedback_Packet, sizeof(SX1280_Feedback_Packet));
+			if(radio_SX1280.receivePayload(((uint8_t*)&SX1280_Send_Packet[0]))){
+				//sprintf(serialBuf, "Vt %lf", SX1280_Send_Packet[0].veltangent);
+				//debug.debug(serialBuf);
+
+				//HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_SET);
 				commCounter = 0;
 			}else{
 				commCounter++;
+
 			}
 			if(commCounter < 100){	//Verifica se recebeu pacote no último 1s
-				robo.set_robo_speed(nRF_Send_Packet[0].velnormal, nRF_Send_Packet[0].veltangent, nRF_Send_Packet[0].velangular);
-				robo.set_kick(nRF_Send_Packet[0].kickspeedx,nRF_Send_Packet[0].kickspeedz);
-				robo.set_dribble(nRF_Send_Packet[0].spinner);
+				robo.set_robo_speed(SX1280_Send_Packet[0].velnormal, SX1280_Send_Packet[0].veltangent, SX1280_Send_Packet[0].velangular);
+				robo.set_kick(SX1280_Send_Packet[0].kickspeedx,SX1280_Send_Packet[0].kickspeedz);
+				robo.set_dribble(SX1280_Send_Packet[0].spinner);
 			}else{
 				//Perdeu a comunicação
 				robo.set_robo_speed(0, 0, 0);
@@ -98,7 +102,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 				HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_RESET);
 				commCounter = 100;
 			}
-		}
+		}*/
 	}
 	else if(htim == robo.R_Kick->KICK_C_TIM)
 	{
@@ -139,21 +143,29 @@ void USBpacketReceivedCallback(void){
 		sprintf(debugmessage, "ID %lu", receivedPacket.id);
 		debug.debug(debugmessage);*/
 		usbCounter = 0;
-		nRF_Send_Packet[receivedPacket.id].kickspeedx = receivedPacket.kickspeedx;
-		nRF_Send_Packet[receivedPacket.id].kickspeedz = receivedPacket.kickspeedz;
-		nRF_Send_Packet[receivedPacket.id].veltangent = receivedPacket.veltangent;
-		nRF_Send_Packet[receivedPacket.id].velnormal = receivedPacket.velnormal;
-		nRF_Send_Packet[receivedPacket.id].velangular = receivedPacket.velangular;
-		nRF_Send_Packet[receivedPacket.id].spinner = receivedPacket.spinner;
+		SX1280_Send_Packet[receivedPacket.id].kickspeedx = receivedPacket.kickspeedx;
+		SX1280_Send_Packet[receivedPacket.id].kickspeedz = receivedPacket.kickspeedz;
+		SX1280_Send_Packet[receivedPacket.id].veltangent = receivedPacket.veltangent;
+		SX1280_Send_Packet[receivedPacket.id].velnormal = receivedPacket.velnormal;
+		SX1280_Send_Packet[receivedPacket.id].velangular = receivedPacket.velangular;
+		SX1280_Send_Packet[receivedPacket.id].spinner = receivedPacket.spinner;
 	}
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-	if(GPIO_Pin == nRF_IRQ_Pin && HAL_GPIO_ReadPin(nRF_IRQ_GPIO_Port, nRF_IRQ_Pin) == GPIO_PIN_RESET){
-		radio.extiCallback();
+/*void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
+	if(GPIO_Pin == SX1280_IRQ_Pin && HAL_GPIO_ReadPin(SX1280_IRQ_GPIO_Port, SX1280_IRQ_Pin) == GPIO_PIN_RESET){
+		radio.GPIOCallback();
+	}
+}*/
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	switch (GPIO_Pin){
+	case GPIO_PIN_5:
+		radio_SX1280.GPIOCallback();
+		break;
+	default:
+		break;
 	}
 }
-
 
 
 void Flash_Write(uint8_t data, uint32_t adress, uint32_t sector_num){
@@ -180,16 +192,19 @@ void Start(){
 			id = 0;
 	debug.setLevel(SerialDebug::DEBUG_LEVEL_DEBUG);
 	debug.info("SSL firmware start");
-	radio.ce(GPIO_PIN_SET);
+	//radio.ce(GPIO_PIN_SET);
 	for (uint32_t i=0; i< NUM_ROBOTS; i++){
 		sendPacket[i] = Feedback_init_default;
 	}
-	nRF_Send_Packet[0].velangular = 0;
-	nRF_Send_Packet[0].veltangent = 0;
-	nRF_Send_Packet[0].velnormal = 0;
-	nRF_Send_Packet[0].kickspeedx = 0;
-	nRF_Send_Packet[0].kickspeedz = 0;
-	nRF_Send_Packet[0].spinner = false;
+// Initial payload
+	SX1280_Send_Packet[0].velangular = 0;
+	SX1280_Send_Packet[0].veltangent = 0;
+	SX1280_Send_Packet[0].velnormal = 0;
+	SX1280_Send_Packet[0].kickspeedx = 0;
+	SX1280_Send_Packet[0].kickspeedz = 0;
+	SX1280_Send_Packet[0].spinner = false;
+
+// Define Robot ID
 	for(uint32_t i=0; i<2000; i++){
 		HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, (GPIO_PinState)(id & 1));
 		HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, (GPIO_PinState)((id>>1) & 1));
@@ -204,18 +219,20 @@ void Start(){
 		HAL_Delay(1);
 	}
 	Flash_Write(id, 0x080E0000, 11);
-	nRF_Feedback_Packet.status = id<<28;
+
+	SX1280_Feedback_Packet.status = id<<28;
 #ifdef DEEPWEB
-	nRF_Feedback_Packet.status |= 1<<2;		//Set bit 2
+	SX1280_Feedback_Packet.status |= 1<<2;		//Set bit 2
 #else
-	nRF_Feedback_Packet.status &= ~(1<<2);	//Reset bit 2
+	SX1280_Feedback_Packet.status &= ~(1<<2);	//Reset bit 2
 #endif
 	HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, GPIO_PIN_RESET);
 	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_RESET);
-	radio.setup();
-	if(HAL_GPIO_ReadPin(TX_Detect_GPIO_Port, TX_Detect_Pin) == GPIO_PIN_RESET){
+	radio_SX1280.setupDataRadio();
+
+	/*if(HAL_GPIO_ReadPin(TX_Detect_GPIO_Port, TX_Detect_Pin) == GPIO_PIN_RESET){
 		//TX (placa de COM)
 		transmitter = true;
 		debug.info("PD10 set as transmitter (computer)");
@@ -230,25 +247,27 @@ void Start(){
 		radio.setRobotId(id);
 	}
 	debug.info("ID = 6");
-	radio.ready = true;
+	radio.ready = true;*/
+
+	// Carrega o capacitor
 	robo.R_Kick->kickCharged = GPIO_PIN_RESET;
 	robo.R_Kick->Charge(5);
 	while(1){
 		if(transmitter){
 			for(uint8_t i=0; i<NUM_ROBOTS; i++){
-				radio.setRobotId(i);
-				nRF_Send_Packet[i].packetId++;
+				SX1280_Send_Packet[i].id = i;
+				SX1280_Send_Packet[i].packetId++;
 				usbCounter++;
 #ifdef INTEL
 				if(usbCounter > 500){	//Verifica se recebeu pacote do USb nos últimos Xs
 					//Perdeu o USB
 					for (uint8_t i=0; i<16; i++){
-						nRF_Send_Packet[i].velangular = 0;
-						nRF_Send_Packet[i].veltangent = 0;
-						nRF_Send_Packet[i].velnormal = 0;
-						nRF_Send_Packet[i].kickspeedx = 0;
-						nRF_Send_Packet[i].kickspeedz = 0;
-						nRF_Send_Packet[i].spinner = false;
+						SX1280_Send_Packet[i].velangular = 0;
+						SX1280_Send_Packet[i].veltangent = 0;
+						SX1280_Send_Packet[i].velnormal = 0;
+						SX1280_Send_Packet[i].kickspeedx = 0;
+						SX1280_Send_Packet[i].kickspeedz = 0;
+						SX1280_Send_Packet[i].spinner = false;
 					}
 					HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, GPIO_PIN_SET);
 					usbCounter = 500;
@@ -256,37 +275,84 @@ void Start(){
 					HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, GPIO_PIN_RESET);
 				}
 #endif
-				radio.sendPayload((uint8_t*)&nRF_Send_Packet[i], sizeof(nRF_Send_Packet[i]));	//Conversão do tipo do ponteiro
-				HAL_Delay(1);
-				if(radio.getReceivedPayload((uint8_t*)&nRF_FeedbackReceive_Packet[i])){
+				//radio.sendPayload((uint8_t*)&SX1280_Send_Packet[i], sizeof(SX1280_Send_Packet[i]));	//Conversão do tipo do ponteiro
+				// Envia o pacote
+				HAL_GPIO_TogglePin(LD6_GPIO_Port, LD6_Pin);
+				if(radio_SX1280.sendPayload((uint8_t*)&SX1280_Send_Packet[i], sizeof(SX1280_Send_Packet[i])))
+				{
+					HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
+				}
+
+				/*if(radio.getReceivedPayload((uint8_t*)&SX1280_FeedbackReceive_Packet[i])){
 					HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
 					//debug.debug((char*)received);
 					USBD_CDC_HandleTypeDef *hcdc = (USBD_CDC_HandleTypeDef*)hUsbDeviceFS.pClassData;
 					//if (hcdc->TxState == 0 && hcdc->RxState == 0){
-						sendPacket[i].battery = nRF_FeedbackReceive_Packet[i].battery;
-						sendPacket[i].encoder1 = nRF_FeedbackReceive_Packet[i].encoder1;
-						sendPacket[i].encoder2 = nRF_FeedbackReceive_Packet[i].encoder2;
-						sendPacket[i].encoder3 = nRF_FeedbackReceive_Packet[i].encoder3;
-						sendPacket[i].encoder4 = nRF_FeedbackReceive_Packet[i].encoder4;
-						sendPacket[i].status = nRF_FeedbackReceive_Packet[i].status;
-						sendPacket[i].id = nRF_FeedbackReceive_Packet[i].status>>28;
+						sendPacket[i].battery = SX1280_FeedbackReceive_Packet[i].battery;
+						sendPacket[i].encoder1 = SX1280_FeedbackReceive_Packet[i].encoder1;
+						sendPacket[i].encoder2 = SX1280_FeedbackReceive_Packet[i].encoder2;
+						sendPacket[i].encoder3 = SX1280_FeedbackReceive_Packet[i].encoder3;
+						sendPacket[i].encoder4 = SX1280_FeedbackReceive_Packet[i].encoder4;
+						sendPacket[i].status = SX1280_FeedbackReceive_Packet[i].status;
+						sendPacket[i].id = SX1280_FeedbackReceive_Packet[i].status>>28;
 						usb.TransmitFeedbackPacket(i, id);
 					//}
-				}
+				}*/
 			}
 			//debug.debug("sent");
-		}else{
-			//nRF_Feedback_Packet.status +=1;
+		}/*else{
+			//SX1280_Feedback_Packet.status +=1;
 			//debug.debug((char*)received);
-			sendPacket[0].battery = nRF_Feedback_Packet.battery;
-			sendPacket[0].encoder1 = nRF_Feedback_Packet.encoder1;
-			sendPacket[0].encoder2 = nRF_Feedback_Packet.encoder2;
-			sendPacket[0].encoder3 = nRF_Feedback_Packet.encoder3;
-			sendPacket[0].encoder4 = nRF_Feedback_Packet.encoder4;
-			sendPacket[0].status = nRF_Feedback_Packet.status;
+			sendPacket[0].battery = SX1280_Feedback_Packet.battery;
+			sendPacket[0].encoder1 = SX1280_Feedback_Packet.encoder1;
+			sendPacket[0].encoder2 = SX1280_Feedback_Packet.encoder2;
+			sendPacket[0].encoder3 = SX1280_Feedback_Packet.encoder3;
+			sendPacket[0].encoder4 = SX1280_Feedback_Packet.encoder4;
+			sendPacket[0].status = SX1280_Feedback_Packet.status;
 			sendPacket[0].id = 0;
 			usb.TransmitFeedbackPacket(0, 0);
 			HAL_Delay(10);
-		}
+		}*/
+
+		if(!transmitter ){/*if(!transmitter && radio.ready)
+				HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+				SX1280_Feedback_Packet.packetId++;
+				SX1280_Feedback_Packet.battery = robo.calc_vbat();
+				if(robo.hasBall()){
+					SX1280_Feedback_Packet.status |= 1<<0;		//Set bit 0
+				}else{
+					SX1280_Feedback_Packet.status &= ~(1<<0);	//Reset bit 0
+				}
+				if(robo.R_Kick->kickCharged){
+					SX1280_Feedback_Packet.status |= 1<<1;
+				}else{
+					SX1280_Feedback_Packet.status &= ~(1<<1);
+				}
+				radio.UploadAckPayload((uint8_t*)&SX1280_Feedback_Packet, sizeof(SX1280_Feedback_Packet));*/
+				if(radio_SX1280.receivePayload(((uint8_t*)&SX1280_Send_Packet[0]))){
+					//sprintf(serialBuf, "Vt %lf", SX1280_Send_Packet[0].veltangent);
+					//debug.debug(serialBuf);
+
+					//HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_SET);
+					commCounter = 0;
+				}else{
+					commCounter++;
+
+				}
+				if(commCounter < 100){	//Verifica se recebeu pacote no último 1s
+					robo.set_robo_speed(SX1280_Send_Packet[0].velnormal, SX1280_Send_Packet[0].veltangent, SX1280_Send_Packet[0].velangular);
+					robo.set_kick(SX1280_Send_Packet[0].kickspeedx,SX1280_Send_Packet[0].kickspeedz);
+					robo.set_dribble(SX1280_Send_Packet[0].spinner);
+				}else{
+					//Perdeu a comunicação
+					robo.set_robo_speed(0, 0, 0);
+					robo.set_kick(0, 0);
+					robo.set_dribble(false);
+					HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_RESET);
+					commCounter = 100;
+				}
+			}
 	}
+
+
 }

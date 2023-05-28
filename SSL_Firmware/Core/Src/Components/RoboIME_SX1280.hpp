@@ -15,6 +15,29 @@
 #include "SerialDebug.hpp"
 #include "sx1280/sx1280-hal.h"
 
+class SX1280_Send_Packet_t{
+public:
+	uint8_t id = 0;
+	float kickspeedx;
+	float kickspeedz;
+	float veltangent;
+	float velnormal;
+	float velangular;
+	bool spinner;
+	uint8_t packetId = 0;
+};
+class SX1280_Feedback_Packet_t{
+public:
+	uint8_t id = 0;
+	uint32_t status = 0;
+	float battery;
+	float encoder1;
+	float encoder2;
+	float encoder3;
+	float encoder4;
+	uint8_t packetId = 0;
+};
+
 class RoboIME_SX1280 {
 public:
 	int  setRobotId(uint8_t id);
@@ -33,7 +56,7 @@ public:
 	void OnRxTimeout( void );
 	void  OnRxError( IrqErrorCode_t errorCode );
 
-	static const uint8_t bufferSize = 128;
+	static const uint8_t bufferSize = 16;
 private:
 	uint8_t payloadTemp[bufferSize];
 		uint8_t roboId;
