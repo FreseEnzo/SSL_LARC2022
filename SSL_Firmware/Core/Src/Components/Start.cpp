@@ -232,22 +232,22 @@ void Start(){
 	HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_RESET);
 	radio_SX1280.setupDataRadio();
 
-	/*if(HAL_GPIO_ReadPin(TX_Detect_GPIO_Port, TX_Detect_Pin) == GPIO_PIN_RESET){
+	if(HAL_GPIO_ReadPin(TX_Detect_GPIO_Port, TX_Detect_Pin) == GPIO_PIN_RESET){
 		//TX (placa de COM)
 		transmitter = true;
 		debug.info("PD10 set as transmitter (computer)");
-		radio.setDirection(PWRUP_TX);
+		//radio.setDirection(PWRUP_TX);
 	}else{
 		//RX (Robô)
 		transmitter = false;
 		debug.info("PD10 set as receiver (robot)");
-		radio.setDirection(PWRUP_RX);
+		//radio.setDirection(PWRUP_RX);
 	}
 	if(!transmitter){
-		radio.setRobotId(id);
+		radio_SX1280.setRobotId(id);
 	}
 	debug.info("ID = 6");
-	radio.ready = true;*/
+	//radio.ready = true;
 
 	// Carrega o capacitor
 	robo.R_Kick->kickCharged = GPIO_PIN_RESET;
@@ -278,7 +278,7 @@ void Start(){
 				//radio.sendPayload((uint8_t*)&SX1280_Send_Packet[i], sizeof(SX1280_Send_Packet[i]));	//Conversão do tipo do ponteiro
 				// Envia o pacote
 				HAL_GPIO_TogglePin(LD6_GPIO_Port, LD6_Pin);
-				if(radio_SX1280.sendPayload((uint8_t*)&SX1280_Send_Packet[i], sizeof(SX1280_Send_Packet[i])))
+				if(radio_SX1280.sendPayload(&SX1280_Send_Packet[i], sizeof(SX1280_Send_Packet[i])))
 				{
 					HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
 				}
@@ -329,11 +329,11 @@ void Start(){
 					SX1280_Feedback_Packet.status &= ~(1<<1);
 				}
 				radio.UploadAckPayload((uint8_t*)&SX1280_Feedback_Packet, sizeof(SX1280_Feedback_Packet));*/
-				if(radio_SX1280.receivePayload(((uint8_t*)&SX1280_Send_Packet[0]))){
+				if(radio_SX1280.receivePayload((&SX1280_Send_Packet[0]))){
 					//sprintf(serialBuf, "Vt %lf", SX1280_Send_Packet[0].veltangent);
 					//debug.debug(serialBuf);
 
-					//HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_SET);
+					HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_SET);
 					commCounter = 0;
 				}else{
 					commCounter++;

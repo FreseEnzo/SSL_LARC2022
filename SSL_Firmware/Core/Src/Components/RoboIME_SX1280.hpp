@@ -18,10 +18,10 @@
 class SX1280_Send_Packet_t{
 public:
 	uint8_t id = 0;
-	float kickspeedx;
-	float kickspeedz;
-	float veltangent;
-	float velnormal;
+	float kickspeedx = 4;
+	float kickspeedz = 3;
+	float veltangent = 2;
+	float velnormal = 1;
 	float velangular;
 	bool spinner;
 	uint8_t packetId = 0;
@@ -43,8 +43,8 @@ public:
 	int  setRobotId(uint8_t id);
 	void GPIOCallback(void);
 	void setPayload( uint8_t *buffer, uint8_t size, uint8_t offset );
-	uint8_t  sendPayload (uint8_t* payload, uint8_t payloadSize);
-	uint8_t receivePayload(uint8_t* payload);
+	uint8_t  sendPayload (SX1280_Send_Packet_t *payload, uint8_t payloadSize);
+	uint8_t receivePayload(SX1280_Send_Packet_t *payload);
 	void setRX(void);
 	int setupDataRadio();
 	int setupFeedbackRadio();
@@ -56,7 +56,7 @@ public:
 	void OnRxTimeout( void );
 	void  OnRxError( IrqErrorCode_t errorCode );
 
-	static const uint8_t bufferSize = 16;
+	static const uint8_t bufferSize = sizeof(SX1280_Send_Packet_t);
 private:
 	uint8_t payloadTemp[bufferSize];
 		uint8_t roboId;

@@ -85,7 +85,7 @@ int RoboIME_SX1280::setupDataRadio(){
 	   PacketParams.Params.Flrc.SyncWordLength        = ( RadioFlrcSyncWordLengths_t )FLRC_SYNCWORD_LENGTH_4_BYTE;
 	   PacketParams.Params.Flrc.SyncWordMatch         = ( RadioSyncWordRxMatchs_t )   RADIO_RX_MATCH_SYNCWORD_1;
 	   PacketParams.Params.Flrc.HeaderType            = ( RadioPacketLengthModes_t )  RADIO_PACKET_VARIABLE_LENGTH;
-	   PacketParams.Params.Flrc.PayloadLength         =                               bufferSize-1;
+	   PacketParams.Params.Flrc.PayloadLength         =                               sizeof(SX1280_Send_Packet_t);
 	   PacketParams.Params.Flrc.CrcLength             = ( RadioCrcTypes_t )           RADIO_CRC_3_BYTES;
 	   PacketParams.Params.Flrc.Whitening             = ( RadioWhiteningModes_t )	  RADIO_WHITENING_OFF;
 
@@ -165,39 +165,39 @@ int RoboIME_SX1280::setupFeedbackRadio(){
 
    	return 0;
 }
-uint8_t RoboIME_SX1280::sendPayload(uint8_t* payload, uint8_t payloadSize){
+uint8_t RoboIME_SX1280::sendPayload(SX1280_Send_Packet_t *payload, uint8_t payloadSize){
 	radio0.SetDioIrqParams( TxIrqMask, TxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
-	radio0.SendPayload( payload, payloadSize,( TickTime_t ){ RADIO_TICK_SIZE_1000_US,TX_TIMEOUT_VALUE } );
-	radio0.GetIrqStatus();
+	radio0.SendPayload((uint8_t*)payload, payloadSize,( TickTime_t ){ RADIO_TICK_SIZE_1000_US,TX_TIMEOUT_VALUE } );
+	//radio0.GetIrqStatus();
 	HAL_Delay(1);
-	/*while(1)
-		 	{
-		 		if(AppState == APP_TX)
-		 		{
-		 			return 1;
-		 		}
-		 		else if (AppState == APP_TX_TIMEOUT)
-				{
-		 			return 0;
-				}
-		 		}*/
+	while(1)
+		{
+			if(AppState == APP_TX)
+			{
+				return 1;
+			}
+			else if (AppState == APP_TX_TIMEOUT)
+			{
+				return 0;
+			}
+		}
 	return 1;
 
 }
-uint8_t RoboIME_SX1280::receivePayload(uint8_t* payload){
+uint8_t RoboIME_SX1280::receivePayload(SX1280_Send_Packet_t *payload){
 	uint8_t actualBufferSize;
 	HAL_Delay(3);
   	radio0.SetDioIrqParams( RxIrqMask, RxIrqMask, IRQ_RADIO_NONE, IRQ_RADIO_NONE );
    	radio0.SetRx( ( TickTime_t ) { RADIO_TICK_SIZE_1000_US, 0x0000 } );
-	oldCount = payloadTemp[0];
+	oldCount = payloadTemp[25];
 
 //HAL_Delay(5);
 		if(AppState == APP_RX)
 		{
-			radio0.GetPayload(payloadTemp, &actualBufferSize, bufferSize);
-			if (payloadTemp[0] != oldCount && payloadTemp[1] == roboId)
+			radio0.GetPayload(payloadTemp, &actualBufferSize, sizeof(SX1280_Send_Packet_t));
+			if (payloadTemp[25] != oldCount && payloadTemp[0] == roboId)
 			{
-				memcpy(payload, payloadTemp, bufferSize);
+				memcpy(payload, payloadTemp, sizeof(SX1280_Send_Packet_t));
 				HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
 				return actualBufferSize;
 			}
