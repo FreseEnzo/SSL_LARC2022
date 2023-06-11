@@ -56,40 +56,14 @@ char serialBuf[64];
 //Objects
 Robo robo(1);
 CommunicationUSB usb(&usbRecvCallback);
-//BTS7960B motorbts(&(TIM10->CCR1), &(TIM11->CCR1), GPIOD, GPIO_PIN_0, GPIOD, GPIO_PIN_1);
-//Motor motor[4] = {Motor(0), Motor(1), Motor(2), Motor(3)};
-//RoboIME_RF24 radio(SX1280_CSn_GPIO_Port, SX1280_CSn_Pin, SX1280_CE_GPIO_Port, SX1280_CE_Pin, SX1280_IRQ_GPIO_Port, SX1280_IRQ_Pin, &hspi1);
+Motor motor[4] = {Motor(0), Motor(1), Motor(2), Motor(3)};
 RoboIME_SX1280 radio_SX1280;
 SerialDebug debug(&huart3);
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if(htim == &htim6){
-	/*	if(!transmitter ){/*if(!transmitter && radio.ready)
-			HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-			SX1280_Feedback_Packet.packetId++;
-			SX1280_Feedback_Packet.battery = robo.calc_vbat();
-			if(robo.hasBall()){
-				SX1280_Feedback_Packet.status |= 1<<0;		//Set bit 0
-			}else{
-				SX1280_Feedback_Packet.status &= ~(1<<0);	//Reset bit 0
-			}
-			if(robo.R_Kick->kickCharged){
-				SX1280_Feedback_Packet.status |= 1<<1;
-			}else{
-				SX1280_Feedback_Packet.status &= ~(1<<1);
-			}
-			radio.UploadAckPayload((uint8_t*)&SX1280_Feedback_Packet, sizeof(SX1280_Feedback_Packet));
-			if(radio_SX1280.receivePayload(((uint8_t*)&SX1280_Send_Packet[0]))){
-				//sprintf(serialBuf, "Vt %lf", SX1280_Send_Packet[0].veltangent);
-				//debug.debug(serialBuf);
-
-				//HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_SET);
-				commCounter = 0;
-			}else{
-				commCounter++;
-
-			}
+		if(!transmitter ){
 			if(commCounter < 100){	//Verifica se recebeu pacote no último 1s
 				robo.set_robo_speed(SX1280_Send_Packet[0].velnormal, SX1280_Send_Packet[0].veltangent, SX1280_Send_Packet[0].velangular);
 				robo.set_kick(SX1280_Send_Packet[0].kickspeedx,SX1280_Send_Packet[0].kickspeedz);
@@ -102,7 +76,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 				HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_RESET);
 				commCounter = 100;
 			}
-		}*/
+		}
 	}
 	else if(htim == robo.R_Kick->KICK_C_TIM)
 	{
@@ -152,11 +126,6 @@ void USBpacketReceivedCallback(void){
 	}
 }
 
-/*void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin){
-	if(GPIO_Pin == SX1280_IRQ_Pin && HAL_GPIO_ReadPin(SX1280_IRQ_GPIO_Port, SX1280_IRQ_Pin) == GPIO_PIN_RESET){
-		radio.GPIOCallback();
-	}
-}*/
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
 	switch (GPIO_Pin){
 	case GPIO_PIN_5:
@@ -261,7 +230,8 @@ void Start(){
 #ifdef INTEL
 				if(usbCounter > 500){	//Verifica se recebeu pacote do USb nos últimos Xs
 					//Perdeu o USB
-					for (uint8_t i=0; i<16; i++){
+					for (uint8_t i=0; i<16; i++)
+					{
 						SX1280_Send_Packet[i].velangular = 0;
 						SX1280_Send_Packet[i].veltangent = 0;
 						SX1280_Send_Packet[i].velnormal = 0;
@@ -283,6 +253,7 @@ void Start(){
 					HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
 				}
 
+				/* FEEDBACK */
 				/*if(radio.getReceivedPayload((uint8_t*)&SX1280_FeedbackReceive_Packet[i])){
 					HAL_GPIO_TogglePin(LD4_GPIO_Port, LD4_Pin);
 					//debug.debug((char*)received);
@@ -314,7 +285,9 @@ void Start(){
 			HAL_Delay(10);
 		}*/
 
-		if(!transmitter ){/*if(!transmitter && radio.ready)
+		if(!transmitter ){
+			/*FEEDBACK*/
+			    /*if(!transmitter && radio.ready)
 				HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
 				SX1280_Feedback_Packet.packetId++;
 				SX1280_Feedback_Packet.battery = robo.calc_vbat();
@@ -329,6 +302,7 @@ void Start(){
 					SX1280_Feedback_Packet.status &= ~(1<<1);
 				}
 				radio.UploadAckPayload((uint8_t*)&SX1280_Feedback_Packet, sizeof(SX1280_Feedback_Packet));*/
+
 				if(radio_SX1280.receivePayload((&SX1280_Send_Packet[0]))){
 					//sprintf(serialBuf, "Vt %lf", SX1280_Send_Packet[0].veltangent);
 					//debug.debug(serialBuf);
